@@ -1,8 +1,6 @@
 import React, {Component} from 'react'
 import PropTypes from 'prop-types'
 
-import Input from 'components-ui/Input'
-
 const KEYBOARD_KEY_BACKSPACE = 8
 const KEYBOARD_KEY_DELETE = 46
 
@@ -129,18 +127,18 @@ class Otp extends Component {
         {this.state.value.map((value, index) => {
           return (
             <div key={index} className="otp__item">
-              <Input
-                ref={(input) => this.inputRefs.push(input)} 
+              <input
                 type={type}
                 pattern={pattern}
-                autoFocus={autoFocus && index == 0}
+                value={value}
+                required={required}
                 placeholder={placeholder}
+                autoFocus={autoFocus && index == 0}
                 onFocus={(event) => this.onFocus(index, event)} 
                 onChange={(event) => this.onChange(index, event)}
                 onKeyUp={(event) => this.onKeyUp(index, event)}
                 onKeyDown={(event) => this.onKeyDown(index, event)}
-                value={value}
-                required={required}
+                ref={(input) => this.inputRefs.push(input)} 
               />
             </div>
           )
