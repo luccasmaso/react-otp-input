@@ -73,10 +73,8 @@ class Otp extends Component {
     return value.join("")
   }
 
-  setCursorForward(cursor, by) {
+  setCursorForward(cursor, by=1) {
     var {size} = this.props
-
-    by = by || 1
 
     this.inputRefs[this.clamp(cursor + by, 0, size - 1)].focus()
   }
