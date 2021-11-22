@@ -1,163 +1,92 @@
-import React, {Component} from 'react'
-import PropTypes from 'prop-types'
+import React, { useEffect, useRef, useState }  from 'react'
 
 const KEYBOARD_KEY_BACKSPACE = 8
 const KEYBOARD_KEY_DELETE = 46
+const MASK_CHAR = "*"
 
-class Otp extends Component {
+export default ({ value, size, autoFocus, onChange, ...props }) => {
+  
+  const previousInput = useRef(null)
+  const refs = useRef([])
+  const [valueArray, setValueArray] = useState([])
 
-  constructor(props) {
-    super(props)
+  useEffect(() => { setValueArray(mapPropsToState()) }, [value])
 
-    this.inputWas = null
-    this.inputRefs = []
-    this.state = {
-      value: []
-    }
-  }
+  const mapPropsToState = () => Array(size).fill("").map((_, index) => (value || "")[index] || MASK_CHAR)
+  const clamp = (val, min, max) => val > max ? max : val < min ? min : val
+  const mapTransientArray = (cursor, valueString) => ([
+    ...valueArray.slice(0, cursor),
+    ...valueArray.slice(cursor, valueArray.length).map((_, index) => valueString[index] || valueArray[index + cursor])
+  ])
 
-  componentDidMount() {
-    var {value, size} = this.props
-
-    this.setState({
-      value: Array(size).fill("").map((_, index) => value[index] || "")
-    })
-  }
-
-  clamp(val, min, max) {
-    return val > max ? max : val < min ? min : val
-  }
-
-  mapTransientArray(cursor, valueString) {
-    var {value} = this.state
-
-    return [
-      ...value.slice(0, cursor),
-      ...value.slice(cursor, value.length).map((_, index) => {
-        return valueString[index] || value[index + cursor]
-      })
-    ]
-  }
-
-  onChange(position, event) {
-    var {onChange} = this.props
-    var {value} = this.state
+  const handleChange = (position, event) => {
     var targetValue = event.target.value
-
     /* 
       When adding value it could come from paste and have 
       more than 1 char, so we need a mapper instead of 
       replace at index
     */
     if (targetValue) {
-      var valueNew = this.mapTransientArray(position, targetValue)
+      var valueArrayNew = mapTransientArray(position, targetValue)
     } else {
-      var valueNew = this.state.value
-      valueNew[position] = ""
+      var valueArrayNew = [...valueArray]
+      valueArrayNew[position] = MASK_CHAR
     }
 
-    if (targetValue.length > 0) {
-        this.setCursorForward(position, targetValue.length)
-    } else {
-      if (value[position] === "") {
-        this.setCursorBackward(position)
-      }
-    }
+    if (targetValue.length > 0) setCursorForward(position)
 
-    this.setState({value: valueNew})
-
-    onChange(this.valuesArrayToString(valueNew))
+    setValueArray(valueArrayNew)
+    onChange(valuesArrayToString(valueArrayNew), { valid: valueArrayNew.findIndex((char) => char === MASK_CHAR) < 0 })
   }
 
-  valuesArrayToString(value) {
-    return value.join("")
+  const valuesArrayToString = (value) => value.join("")
+  const setCursorForward = (cursor) => {
+    refs.current[clamp(cursor + 1, 0, size - 1)].focus()
+    if (cursor + 1 < size) refs.current[clamp(cursor + 1, 0, size - 1)].select()
   }
 
-  setCursorForward(cursor, by=1) {
-    var {size} = this.props
-
-    this.inputRefs[this.clamp(cursor + by, 0, size - 1)].focus()
+  const setCursorBackward = (cursor) => {
+    refs.current[clamp(cursor - 1, 0, size - 1)].focus()
+    refs.current[clamp(cursor - 1, 0, size - 1)].select()
   }
 
-  setCursorBackward(cursor) {
-    var {size} = this.props
-
-    this.inputRefs[this.clamp(cursor - 1, 0, size - 1)].focus()
-  }
-
-  onFocus(position, event) {
-    event.target.select()
-    
-    this.setState({cursor: position})
-  }
-
-  onKeyDown(index, event) {
-    this.inputWas = this.state.value[index]
-  }
+  const handleFocus = (event) => event.target.select()
+  const handleKeyDown = (index) => previousInput.current = valueArray[index]
 
   /* 
     When `onKeyUp` event is handled, `onChange` handler may have changed the focus because it fires before.
     So, we need to make a check in the previous cursor input with `inputWas` to avoid moving cursor backwards two times
   */
-  onKeyUp(index, event) {
+  const handleKeyUp = (index, event) => {
     var value = String.fromCharCode(event.which)
     
-    if (this.inputWas === value) {
-      this.setCursorForward(index)
-    }
-
-    if (this.isBackKey(event) && this.inputWas === "") {
-      this.setCursorBackward(index)
-    }
+    if (previousInput.current === value) setCursorForward(index)
+    if (previousInput.current === MASK_CHAR && isBackKey(event)) setCursorBackward(index)
   }
 
-  isBackKey(event) {
-    var key = event.keyCode || event.charCode
-    
-    return KEYBOARD_KEY_BACKSPACE == key || KEYBOARD_KEY_DELETE == key
-  }
+  const isBackKey = (event) => 
+    KEYBOARD_KEY_BACKSPACE == (event.keyCode || event.charCode) || KEYBOARD_KEY_DELETE == (event.keyCode || event.charCode) 
 
-  render() {
-    var {placeholder, type, pattern, required, autoFocus} = this.props
+  const charValue = (value) => value === MASK_CHAR ? "" : value
+  const shouldAutoFocus = (index) => autoFocus && index === 0
 
-    return (
-      <div className="otp">
-        {this.state.value.map((value, index) => {
-          return (
-            <div key={index} className="otp__item">
-              <input
-                type={type}
-                pattern={pattern}
-                value={value}
-                required={required}
-                placeholder={placeholder}
-                autoFocus={autoFocus && index == 0}
-                onFocus={(event) => this.onFocus(index, event)} 
-                onChange={(event) => this.onChange(index, event)}
-                onKeyUp={(event) => this.onKeyUp(index, event)}
-                onKeyDown={(event) => this.onKeyDown(index, event)}
-                ref={(input) => this.inputRefs.push(input)} 
-              />
-            </div>
-          )
-        })}
-      </div>
-    )
-  }
+  return (
+    <div>
+      {valueArray.map((valueItem, index) => (
+        <input
+          {...props}
+          key={index}
+          value={charValue(valueItem)}
+          ref={(ref) => refs.current.push(ref)} 
+          autoFocus={shouldAutoFocus(index)}
+          onFocus={handleFocus} 
+          onChange={(event) => handleChange(index, event)}
+          onKeyUp={(event) => handleKeyUp(index, event)}
+          onKeyDown={(event) => handleKeyDown(index, event)}
+          maxLength={1}
+        />
+      ))}
+    </div>
+  )
 
 }
-
-Otp.defaultProps = {
-  type: "text",
-  autoFocus: false,
-  required: false
-}
-
-Otp.propTypes = {
-  type: PropTypes.string,
-  pattern: PropTypes.string,
-  autoFocus: PropTypes.bool,
-  required: PropTypes.bool
-}
-
-export default Otp
